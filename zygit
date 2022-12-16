@@ -1,0 +1,120 @@
+#!/Users/zacharybrugh/.pyenv/versions/pygit/bin/python
+
+import argparse
+
+from libzygit import (
+    cmd_init,
+    cmd_cat_file,
+    cmd_hash_object,
+    cmd_status,
+    cmd_add, 
+    cmd_commit,
+)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="The stupid content tracker")
+    subparsers = parser.add_subparsers(title="Commands", dest="command")
+    subparsers.required = True
+
+    # init
+    argsp = subparsers.add_parser("init", help="Initialize a new, empty repository.")
+    argsp.add_argument(
+        "path",
+        metavar="directory",
+        nargs="?",
+        default=".",
+        help="Where to create the repository.",
+    )
+
+
+    # cat-file
+    argsp = subparsers.add_parser(
+        "cat-file", help="Provide content of repository objects"
+    )
+    argsp.add_argument(
+        "type",
+        metavar="type",
+        choices=["blob", "commit", "tag", "tree"],
+        help="Specify the type",
+    )
+    argsp.add_argument("object", metavar="object", help="The object to display")
+
+
+    # hash-object
+    argsp = subparsers.add_parser(
+        "hash-object", help="Compute object ID and optionally creates a blob from a file"
+    )
+    argsp.add_argument(
+        "-t",
+        metavar="type",
+        dest="type",
+        choices=["blob", "commit", "tag", "tree"],
+        default="blob",
+        help="Specify the type",
+    )
+    argsp.add_argument(
+        "-w",
+        dest="write",
+        action="store_true",
+        help="Actually write the object into the database",
+    )
+    argsp.add_argument("path", help="Read object from <file>")
+
+
+    # status
+    argsp = subparsers.add_parser("status", help="show status of working copy")
+
+
+    # add
+    argsp = subparsers.add_parser("add", help="Add file contents to the index")
+    argsp.add_argument("paths", nargs="*", help="Add file contents to the index")
+    argsp.add_argument(
+        "-A",
+        dest="all",
+        action="store_true",
+        help=(
+            "Update the index not only where the working tree has a file matching <pathspec> "
+            "but also where the index already has an entry."
+        ),
+    )
+
+
+    # commit
+    argsp = subparsers.add_parser("commit", help="Record changes to the repository")
+    argsp.add_argument("author",
+                     help="Specify the author")
+    argsp.add_argument("parent",
+                     help="Specify the parent commit")
+    argsp.add_argument("committer",
+                     help="Specify who committed.")
+    argsp.add_argument("message",
+                     help="Specify the commit message")
+
+
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+
+    # wyag provided
+    if args.command == "init":
+        cmd_init(args)
+    elif args.command == "cat-file":
+        cmd_cat_file(args)
+    elif args.command == "hash-object":
+        cmd_hash_object(args)
+    
+    # independently implemented
+    elif args.command == "commit":
+        cmd_commit(args)
+    elif args.command == "status":
+        cmd_status(args)
+    elif args.command == "add":
+        cmd_add(args)
+
+
+
+if __name__ == "__main__":
+    main()

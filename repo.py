@@ -1,6 +1,7 @@
 import configparser
 import os
 
+
 class GitRepository(object):
     """A git repository"""
 
@@ -10,9 +11,9 @@ class GitRepository(object):
 
     def __init__(self, path, force=False):
         self.worktree = path
-        self.zygitdir = os.path.join(path, ".zygit")
+        self.gitdir = os.path.join(path, ".zygit")
 
-        if not (force or os.path.isdir(self.zygitdir)):
+        if not (force or os.path.isdir(self.gitdir)):
             raise Exception("Not a Git repository %s" % path)
 
         # Read configuration file in .zygit/config
@@ -54,7 +55,7 @@ def find(path=".", required=True):
 
 def get_path(repo, *path):
     """Compute path under repo's gitdir."""
-    return os.path.join(repo.zygitdir, *path)
+    return os.path.join(repo.gitdir, *path)
 
 
 def file(repo, *path, mkdir=False):

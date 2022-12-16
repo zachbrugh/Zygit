@@ -1,10 +1,10 @@
 import hashlib
 import os
+import pickle
 import re
 import zlib
 
 import repo
-import util
 
 class GitObject(object):
     repository = None
@@ -35,36 +35,36 @@ class GitBlob(GitObject):
     def deserialize(self, data):
         self.blobdata = data
 
+def create_blob(abs_path, repository):
+    with open(abs_path, 'rb') as f:
+        data = f.read()
+        return GitBlob(repository, data)
 
 class GitCommit(GitObject):
     fmt = b"commit"
 
     def deserialize(self, data):
-        self.kvlm = util.kvlm_parse(data)
+        data_from_commit = pickle.loads(data)
+        self.parent = data_from_commit.parent
+        self.author = data_from_commit.author
+        self.message = data_from_commit.message
+        self.tree = data_from_commit.tree
+
 
     def serialize(self):
-        return util.kvlm_serialize(self.kvlm)
+        return pickle.dumps(self)
+
+    def __repr__(self):
+        return (
+            f"parent: {self.parent}\n"
+            f"author: {self.author}\n"
+            f"message: {self.message}\n"
+            f"tree: {self.tree}\n"
+        )
 
 
 class GitTag(GitCommit):
     fmt = b"tag"
-
-
-class GitTreeLeaf(object):
-    def __init__(self, mode, path, sha):
-        self.mode = mode
-        self.path = path
-        self.sha = sha
-
-
-class GitTree(GitObject):
-    fmt = b"tree"
-
-    def deserialize(self, data):
-        self.items = tree_parse(data)
-
-    def serialize(self):
-        return tree_serialize(self)
 
 
 def ref_create(repository, ref_name, sha):
@@ -85,6 +85,7 @@ def ref_resolve(repository, ref):
 def read(repository, sha):
     """Read object id from Git repositorysitory repository.  Return a
     GitObject whose exact type depends on the object."""
+    from tree import GitTree
 
     path = repo.file(repository, "objects", sha[0:2], sha[2:])
 
@@ -129,7 +130,9 @@ def write(obj, actually_write=True):
 
     if actually_write:
         # Compute path
-        path = repo.file(obj.repository, "objects", sha[0:2], sha[2:], mkdir=actually_write)
+        path = repo.file(
+            obj.repository, "objects", sha[0:2], sha[2:], mkdir=actually_write
+        )
 
         with open(path, "wb") as f:
             # Compress and write
@@ -145,8 +148,6 @@ def hash(fd, fmt, repository=None):
     # object type found in header.
     if fmt == b"commit":
         obj = GitCommit(repository, data)
-    elif fmt == b"tree":
-        obj = GitTree(repository, data)
     elif fmt == b"tag":
         obj = GitTag(repository, data)
     elif fmt == b"blob":
@@ -232,45 +233,3 @@ def find(repository, name, fmt=None, follow=True):
             sha = obj.kvlm[b"tree"].decode("ascii")
         else:
             return None
-
-
-def tree_parse_one(raw, start=0):
-    # Find the space terminator of the mode
-    x = raw.find(b" ", start)
-    assert x - start == 5 or x - start == 6
-
-    # Read the mode
-    mode = raw[start:x]
-
-    # Find the NULL terminator of the path
-    y = raw.find(b"\x00", x)
-    # and read the path
-    path = raw[x + 1 : y]
-
-    # Read the SHA and convert to an hex string
-    sha = hex(int.from_bytes(raw[y + 1 : y + 21], "big"))[2:]  # hex() adds 0x in front,
-    # we don't want that.
-    return y + 21, GitTreeLeaf(mode, path, sha)
-
-
-def tree_parse(raw):
-    pos = 0
-    max = len(raw)
-    ret = list()
-    while pos < max:
-        pos, data = tree_parse_one(raw, pos)
-        ret.append(data)
-
-    return ret
-
-
-def tree_serialize(obj):
-    ret = b""
-    for i in obj.items:
-        ret += i.mode
-        ret += b" "
-        ret += i.path
-        ret += b"\x00"
-        sha = int(i.sha, 16)
-        ret += sha.to_bytes(20, byteorder="big")
-    return ret
